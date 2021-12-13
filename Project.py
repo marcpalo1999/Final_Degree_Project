@@ -40,7 +40,7 @@ def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
     a = 0
     b = 0
 
-    
+    patient_dataframe.reset_index()
     #We search for "verb'" inside the event feature
     try:
         idx = list(patient_dataframe['EVENT']).index(word1)
@@ -61,49 +61,48 @@ def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
     return idx
 
 # entering the df of a patient and moment o fverbal response (idx) and the desired features it returns the patient df  cassted to 120s and interposalted and the resulting output (LoC  = 0 or 1)
-def data_preprocessing(patient_dataframe,selected_features):
+def data_preprocessing(patient_dataframe,idx,selected_features):
     #Busquem el index del primer valor de propo i si no hi és descartem el pacient
-    
-    
-    
-    #Interpolation of variables
-    for element in patient_dataframe.columns:
-        patient_dataframe.loc[:,element] = patient_dataframe.loc[:,element].interpolate(axis = 0, method = 'linear')
-        #a[element].fillnull(mean(a[element]), inplace = True)
-
-
-
-    patient_dataframe.reset_index()
-    patient_dataframe = patient_dataframe.loc[:,['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE','EVENT']]
-    patient_dataframe = patient_dataframe.dropna(subset = selected_features)
     patient_dataframe.reset_index()
     fvi = patient_dataframe['PROPO_CE'].first_valid_index()
-    idx = finder(patient_dataframe, word1 = "verb'", word2 ="verbal")
     
+    #Interpolation of variables
+    
+
     if fvi != None and idx > fvi:
+
+        #Aqui està agafpd.ant el index de 60 abans del verbal
+        
+        a = patient_dataframe.loc[fvi:(2*idx-fvi),:]
+        a.reset_index()
+
+        for element in patient_dataframe.columns:
+            a.loc[:,element] = a.loc[:,element].interpolate(axis = 0, method = 'linear')
+        #a[element].fillnull(mean(a[element]), inplace = True)
+        
 
         #LoC binarisation (creatinc a vector of 0 until negative verbal response, and the other are 1)
         vec1 = list(repeat(0,idx -fvi))
-        vec2= repeat(1,idx-fvi+1)
+        vec2= repeat(1,idx-fvi)
         for element in vec2:
             vec1.append(element)
         #print(vec1+vec2)
         LoC = pd.DataFrame(vec1)
 
+        #Que miri si vol mirar remi i propo o nomes propo
         
-        #Aqui està agafant el index de 60 abans del verbal
-        a = patient_dataframe.loc[fvi:(2*idx-fvi),:]
-        a.reset_index()
+        a.loc[:,'LoC'] = LoC
+        #CUIDADO QUE AQUI ESTEM PERDENT INFO, EN CONCRET TOT ELS QUE FAN PROPO I NO REMI
+        a = a.loc[:,['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE', 'LoC']]
+        a = a.dropna()
+        LoC = a['LoC']
         a = a.loc[:,selected_features]
-        
-        
     else: 
         a = pd.DataFrame(columns= selected_features)
         LoC = pd.DataFrame()
+    
+    
 
-    #print(len(a),len(LoC))
-    
-    
     return [a, LoC]
 
 #Variable initialization
@@ -137,7 +136,7 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
             
             
             #We cut the patients' dataframe info  +/- 2 minutes from the lose of verbal response
-            frame, LoC = data_preprocessing(archive,selected_features)
+            frame, LoC = data_preprocessing(archive,index,selected_features)
             
 
             #We append the 240 seconds patients' dataframes for later concatenation and visualization
