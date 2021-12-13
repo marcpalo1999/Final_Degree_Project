@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from os import chdir
 from scipy.interpolate import interp1d
-
+import random
 
 # Import datasets, classifiers and performance metrics
 from sklearn.metrics import ConfusionMatrixDisplay
@@ -24,22 +24,23 @@ from os import chdir, getcwd
 
 path = '/Users/marcpalomercadenas/Desktop/TFG/TFG/archives/VARIABLES.xlsx'
 source = pd.read_excel(path)
- 
+ #Input feature selection
+selected_features = ['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE']
 
 #Jo veig dues opcions de preparar les dades. Una primera que és la que estic fent
 #On a cada segon ens hauria de donar la probabilitat de que la resposta verbal fos negativa
 #La segonaopció seria fer un dataframe on cada pacient fos una obsrvació i que tinguessim la
 #Ce (concentració efecte) a on s'ha detectat la perdua de resposta verbal i els segons que s'ha trigat 
 #des de l'inici de la infució. (Aixó estaria bé ficarho a analisis de possibilitats)
-def Finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
-    
+def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
+    patient_dataframe.reset_index()
     #We initialize the local variables and the error counter
     #to know how many patients are being lost without verbal response
     idx = []
     a = 0
     b = 0
 
-    patient_dataframe.reset_index()
+    
     #We search for "verb'" inside the event feature
     try:
         idx = list(patient_dataframe['EVENT']).index(word1)
@@ -59,50 +60,64 @@ def Finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
 
     return idx
 
-
-def data_preprocessing(patient_dataframe,idx):
+# entering the df of a patient and moment o fverbal response (idx) and the desired features it returns the patient df  cassted to 120s and interposalted and the resulting output (LoC  = 0 or 1)
+def data_preprocessing(patient_dataframe,selected_features):
     #Busquem el index del primer valor de propo i si no hi és descartem el pacient
+    
+    
+    
+    #Interpolation of variables
+    for element in patient_dataframe.columns:
+        patient_dataframe.loc[:,element] = patient_dataframe.loc[:,element].interpolate(axis = 0, method = 'linear')
+        #a[element].fillnull(mean(a[element]), inplace = True)
+
+
+
+    patient_dataframe.reset_index()
+    patient_dataframe = patient_dataframe.loc[:,['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE','EVENT']]
+    patient_dataframe = patient_dataframe.dropna(subset = selected_features)
     patient_dataframe.reset_index()
     fvi = patient_dataframe['PROPO_CE'].first_valid_index()
+    idx = finder(patient_dataframe, word1 = "verb'", word2 ="verbal")
     
+    if fvi != None and idx > fvi:
 
-    if fvi != None:
-
-        #Aqui està agafpd.ant el index de 60 abans del verbal
-        a = patient_dataframe.iloc[fvi:(idx+fvi),:]
-        a.reset_index()
-
-        #Interpolation of variables
-        for element in ['ECG_HR', 'NIBP_MEAN','PROPO_CE']:
-            a[element] = a[element].interpolate(axis = 0, method = 'linear')
-            #a[element].fillnull(mean(a[element]), inplace = True)
-        
         #LoC binarisation (creatinc a vector of 0 until negative verbal response, and the other are 1)
-        vec1 = list(repeat(0,idx))
-        vec2= repeat(1,idx)
+        vec1 = list(repeat(0,idx -fvi))
+        vec2= repeat(1,idx-fvi+1)
         for element in vec2:
             vec1.append(element)
         #print(vec1+vec2)
-        a['LoC'] = pd.DataFrame(vec1)
+        LoC = pd.DataFrame(vec1)
 
+        
+        #Aqui està agafant el index de 60 abans del verbal
+        a = patient_dataframe.loc[fvi:(2*idx-fvi),:]
+        a.reset_index()
+        a = a.loc[:,selected_features]
+        
+        
     else: 
-        a = []
+        a = pd.DataFrame(columns= selected_features)
+        LoC = pd.DataFrame()
+
+    #print(len(a),len(LoC))
     
-    #Que miri si vol mirar remi i propo o nomes propo
-    return a
+    
+    return [a, LoC]
 
 #Variable initialization
-general_dataframe = []
+general_dataframe = pd.DataFrame()
 X_train =[]
 X_test = []
 y_train = []
 y_test = []
-Verbal_and_propo = 0
+Verbal_propo_remi = 0
 available_event = 0
 no_event = 0
 e = 0
 
-#Then we extract a list of filenames  from first csv to open all the others
+#Extracting patients df
 for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
     if event_state == 'AVAILABLE':
         
@@ -115,68 +130,52 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
         archive = pd.read_csv(patient_ID+'.csv')
 
         #Finder returns the index of the verbal response
-        index = Finder(patient_dataframe = archive, word1 = "verb'", word2 ="verbal")
+        index = finder(patient_dataframe = archive, word1 = "verb'", word2 ="verbal")
 
+        #If there is index of verbal response, there is verbal response
         if index != []:
             
             
-
             #We cut the patients' dataframe info  +/- 2 minutes from the lose of verbal response
-            frame = data_preprocessing(archive,index)
-            #Aqui hauriem de generar un nou parametre que tornes de data_preprocessing
-            #i que fos la condició per fer l'append final
+            frame, LoC = data_preprocessing(archive,selected_features)
+            
+
+            #We append the 240 seconds patients' dataframes for later concatenation and visualization
+            pd.concat([general_dataframe, pd.concat([frame, LoC], ignore_index = True)], ignore_index= True)
+
+            #If the patient had verb resp on propo+remi, the dataframe shouldn't be empty: 
             if len(frame) != 0:
-                
-                #We count the number of patients with verbal response in propo induction
 
-                Verbal_and_propo = Verbal_and_propo +1
-                
-                
-                #We append the 240 seconds patients' dataframes for later concatenation and visualization
-                general_dataframe.append(frame)
 
-                #Input feature selection
-                selected_features = ['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'LoC']
-                frame = frame[selected_features]
+                #We count the number of patients with verbal response in propo+Remi induction
+                Verbal_propo_remi = Verbal_propo_remi +1
 
-                #CUIDADO QUE AQUI ESTEM PERDENT INFO
-                frame = frame.dropna()
-                
-                #As some patients use remifentanil, they fall as a whole set bc of NaN drop
-                if len(frame) >0:
+                #Data scaling. There are a lot more types of scaling
+                from sklearn.preprocessing import MaxAbsScaler
+                scaler = MaxAbsScaler()
+                frame = scaler.fit_transform(frame)
+
+                # Split data into train and test subsets, randomly and putting whole patients in train or test, to avoid overfitting.
+                x = random.uniform(0,1)
+                if x < 0.4:
                     
-                    
-                    #Data scaling. There are a lot more types of scaling
-                    from sklearn.preprocessing import MaxAbsScaler
-                    scaler = MaxAbsScaler()
-                    frame = scaler.fit_transform(frame)
-
-                    # Split data into train and test subsets 
-                    X_train_patient, X_test_patient, y_train_patient, y_test_patient = train_test_split(frame , frame[:,-1], test_size=0.5, shuffle=False
-                    )
-                    X_train.append(X_train_patient)
-                    X_test.append(X_test_patient)
-                    y_train.append(y_train_patient)
-                    y_test.append(y_test_patient)
-
+                    X_train.append(frame)
+                    y_train.append(LoC)
                 else:
-                    e = e+1
-                    
+                    X_test.append(frame)
+                    y_test.append(LoC)
                 
-                
-
-                
-
-
+ 
+            else:
+                e = e+1
     else:
         no_event = no_event +1
 
 
 print(f'There are {available_event}  patients from {available_event + no_event} with recorded events of any type')
-print(f'There are {round((Verbal_and_propo)*100/available_event,1)}% of patients from the {available_event} with recorded events presenting negative verbal response at some point while propo induction')
+print(f'There are {round((Verbal_propo_remi)*100/available_event,1)}% of patients from the {available_event} with recorded events presenting negative verbal response at some point while propo induction')
 
-#Concatenation the patients' data for viauslization
-input = pd.concat(general_dataframe)
+#Concatenation the patients' data for model training
 X_train = concatenate((X_train))
 X_test = concatenate(X_test)
 y_train = concatenate(y_train)
@@ -184,7 +183,7 @@ y_test = concatenate(y_test)
 
 
 # Create a classifier: a support vector classifier
-clf = svm.SVC(gamma=0.001)
+clf = svm.SVC(gamma=0.1) #, probability = True
 clf.fit(X_train, y_train)
 
 predicted = clf.predict(X_test)
@@ -214,3 +213,6 @@ plt.show()
 #1- Com miro els valors dun dataframe al debug?
 #2- He de normalitzar respecte als maxims de cada pacient o respecte als maxims totals?
 #3- Com pot ser que la confusion matrix i els parametres del model siguin perfectes? Vaig pensar que era pel que m'havies comentat de fer el split per pacient i no, perque ara al canviarho passa el mateix.
+
+#Al ficar REMI també les dades se'm redueixen a la meitat.
+#No hi ha molta disparitat entre valors a prediure?
