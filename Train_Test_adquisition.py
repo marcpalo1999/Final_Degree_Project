@@ -1,15 +1,4 @@
-from numpy import *
-import pandas as pd
-import matplotlib.pyplot as plt
-from os import chdir
-from scipy.interpolate import interp1d
-import random
-
-# Import datasets, classifiers and performance metrics
-from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn import datasets, svm, metrics
-from sklearn.model_selection import train_test_split
-from os import chdir, getcwd
+from libraries import *
 #Hauria d'importar el primer CSV i veure a on hi ha events (pel training set)
 #Després fer un data frame juntant tots els csv?
 #I un model que m'indiques si el pacient està en fase de no resposta ciliar
@@ -33,14 +22,14 @@ selected_features = ['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE']
 #Ce (concentració efecte) a on s'ha detectat la perdua de resposta verbal i els segons que s'ha trigat 
 #des de l'inici de la infució. (Aixó estaria bé ficarho a analisis de possibilitats)
 def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
-    patient_dataframe.reset_index()
+    patient_dataframe.reset_index(drop = True)
     #We initialize the local variables and the error counter
     #to know how many patients are being lost without verbal response
     idx = []
     a = 0
     b = 0
 
-    patient_dataframe.reset_index()
+    patient_dataframe.reset_index(drop=True)
     #We search for "verb'" inside the event feature
     try:
         idx = list(patient_dataframe['EVENT']).index(word1)
@@ -63,7 +52,7 @@ def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
 # entering the df of a patient and moment o fverbal response (idx) and the desired features it returns the patient df  cassted to 120s and interposalted and the resulting output (LoC  = 0 or 1)
 def data_preprocessing(patient_dataframe,idx,selected_features):
     #Busquem el index del primer valor de propo i si no hi és descartem el pacient
-    patient_dataframe.reset_index()
+    patient_dataframe.reset_index(drop = True)
     fvi = patient_dataframe['PROPO_CE'].first_valid_index()
     
     #Interpolation of variables
@@ -74,7 +63,7 @@ def data_preprocessing(patient_dataframe,idx,selected_features):
         #Aqui està agafpd.ant el index de 60 abans del verbal
         
         a = patient_dataframe.loc[fvi:(2*idx-fvi),:]
-        a.reset_index()
+        a.reset_index(drop=True)
 
         for element in patient_dataframe.columns:
             a.loc[:,element] = a.loc[:,element].interpolate(axis = 0, method = 'linear')
@@ -156,7 +145,7 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
 
                 # Split data into train and test subsets, randomly and putting whole patients in train or test, to avoid overfitting.
                 x = random.uniform(0,1)
-                if x < 0.4:
+                if x < 0.5:
                     
                     X_train.append(frame)
                     y_train.append(LoC)
@@ -180,38 +169,8 @@ X_test = concatenate(X_test)
 y_train = concatenate(y_train)
 y_test = concatenate(y_test)
 
-
-# Create a classifier: a support vector classifier
-clf = svm.SVC(gamma=0.1) #, probability = True
-clf.fit(X_train, y_train)
-
-predicted = clf.predict(X_test)
-print(
-    f"Classification report for classifier {clf}:\n"
-    f"{metrics.classification_report(y_test, predicted)}\n"
-)
-
-###############################################################################
-# We can also plot a :ref:`confusion matrix <confusion_matrix>` of the
-# true digit values and the predicted digit values.
-
-disp = ConfusionMatrixDisplay.from_predictions(y_test, predicted)
-disp.figure_.suptitle("Confusion Matrix")
-print(f"Confusion matrix:\n{disp.confusion_matrix}")
-
-plt.show()
-
-##Comentaris
-# -1r agafar propo i remi ce, començar a agafar dades des d'on comença a infundir propo ce i si algun pacient no en té cap no agafarlo directament FET
-#Que les dades estiguin balancejades, igual num de dades abans i despres de l verbal (pel pairing i perque el model no fagi lu de la classificació gats gossos) FET
-#Interpolació de valors que no hi són FET
-#Tots els moments d'abans del verbal que siguin 0 i els altres 1. Comprovar fent debug que els frames que donen son correctes
-# I ara que fer?
-
-#Preguntes:
-#1- Com miro els valors dun dataframe al debug?
-#2- He de normalitzar respecte als maxims de cada pacient o respecte als maxims totals?
-#3- Com pot ser que la confusion matrix i els parametres del model siguin perfectes? Vaig pensar que era pel que m'havies comentat de fer el split per pacient i no, perque ara al canviarho passa el mateix.
-
-#Al ficar REMI també les dades se'm redueixen a la meitat.
-#No hi ha molta disparitat entre valors a prediure?
+#Saving the matrices to csv so that the results don't change constantly
+pd.DataFrame(X_train).to_csv('/Users/marcpalomercadenas/Desktop/TFG/TFG/TrainTestMatrices/X_train.csv')
+pd.DataFrame(X_test).to_csv('/Users/marcpalomercadenas/Desktop/TFG/TFG/TrainTestMatrices/X_test.csv')
+pd.DataFrame(y_train).to_csv('/Users/marcpalomercadenas/Desktop/TFG/TFG/TrainTestMatrices/y_train.csv')
+pd.DataFrame(y_test).to_csv('/Users/marcpalomercadenas/Desktop/TFG/TFG/TrainTestMatrices/y_test.csv')
