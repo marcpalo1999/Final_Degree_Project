@@ -22,13 +22,15 @@ predicted = SVM.predict(X_test)
 y_pred_proba =SVM.predict_proba(X_test)[:,-1]
 false_positive_rate, true_positive_rate, thresholds = roc_curve(y_test, y_pred_proba)
 roc_curve_plot = metrics.plot_roc_curve(SVM, X_test, y_test) 
-plt.title('ROC curve')
-plt.ylabel('True positive rate')
-plt.ylabel('True negative rate (positive label: 1)')
-plt.ylabel('a')
 ax = plt.gca()
 rfc_disp = metrics.plot_roc_curve(rfc, X_test, y_test, ax=ax, alpha=0.8)
 roc_curve_plot.plot(ax=ax, alpha=0.8)
+plt.title('ROC curve')
+plt.ylabel('True positive rate')
+plt.xlabel('False positive rate (positive label: 1)')
+
+
+plt.savefig('ROC curve')
 plt.show()
 
 #Veiem que se li dona bé distingir 
@@ -46,6 +48,7 @@ disp = ConfusionMatrixDisplay.from_predictions(y_test, predicted)
 disp.figure_.suptitle("Confusion Matrix")
 print(f"Confusion matrix:\n{disp.confusion_matrix}")
 
+plt.savefig('ConfusionMatrix')
 plt.show()
 
 
@@ -83,7 +86,7 @@ roc_auc = auc(fpr, tpr)
 #Hyper parameter tunning -> buscar la millor AUC
 #Enviar-li la momoria com a molt tard el 9 (deadline meu el 27)
 #Enviarli uns grafics ROC per exemple i dun pacient per un altre exemple amb els events marcats
-#SOlucionar el problema de les poques dades
+#Solucionar el problema de les poques dades PRIORITAT
 
 #Validació Jaramillo:
     #Demanarli tot i mirarmho

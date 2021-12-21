@@ -65,24 +65,17 @@ def data_preprocessing(patient_dataframe,idx,selected_features):
         a = patient_dataframe.loc[fvi:(2*idx-fvi),:]
         a.reset_index(drop=True)
 
-        for element in patient_dataframe.columns:
-            a.loc[:,element] = a.loc[:,element].interpolate(axis = 0, method = 'linear')
-        #a[element].fillnull(mean(a[element]), inplace = True)
-        
+        #Interpolem Nans
+        a.interpolate(method='linear', limit_direction='forward', axis=0)
 
         #LoC binarisation (creatinc a vector of 0 until negative verbal response, and the other are 1)
-        vec1 = list(repeat(0,idx -fvi))
-        vec2= repeat(1,idx-fvi)
-        for element in vec2:
-            vec1.append(element)
-        #print(vec1+vec2)
-        LoC = pd.DataFrame(vec1)
-
-        #Que miri si vol mirar remi i propo o nomes propo
+        #Generatinc LoC feature from 'Event' extraction
+        a['LoC'] = 0
+        a.loc[idx:,'LoC'] = 1
         
-        a.loc[:,'LoC'] = LoC
         #CUIDADO QUE AQUI ESTEM PERDENT INFO, EN CONCRET TOT ELS QUE FAN PROPO I NO REMI
         a = a.loc[:,['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE', 'LoC']]
+        a.loc[:,'REMI_CE'] = a.loc[:,'REMI_CE'].fillna(0)
         a = a.dropna()
         LoC = a['LoC']
         a = a.loc[:,selected_features]
@@ -100,11 +93,11 @@ X_train =[]
 X_test = []
 y_train = []
 y_test = []
-Verbal_propo_remi = 0
 available_event = 0
 no_event = 0
 e = 0
-
+available_index = 0
+available_patient = 0
 #Extracting patients df
 for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
     if event_state == 'AVAILABLE':
@@ -122,7 +115,7 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
 
         #If there is index of verbal response, there is verbal response
         if index != []:
-            
+            available_index = available_index+1
             
             #We cut the patients' dataframe info  +/- 2 minutes from the lose of verbal response
             frame, LoC = data_preprocessing(archive,index,selected_features)
@@ -133,10 +126,8 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
 
             #If the patient had verb resp on propo+remi, the dataframe shouldn't be empty: 
             if len(frame) != 0:
+                available_patient = available_patient +1
 
-
-                #We count the number of patients with verbal response in propo+Remi induction
-                Verbal_propo_remi = Verbal_propo_remi +1
 
                 #Data scaling. There are a lot more types of scaling
                 from sklearn.preprocessing import MaxAbsScaler
@@ -160,8 +151,8 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
         no_event = no_event +1
 
 
-print(f'There are {available_event}  patients from {available_event + no_event} with recorded events of any type')
-print(f'There are {round((Verbal_propo_remi)*100/available_event,1)}% of patients from the {available_event} with recorded events presenting negative verbal response at some point while propo induction')
+print(f'There are {available_index}  patients from {available_index + no_event} with verbal response recording')
+print(f'There are {round((available_patient)*100/available_index,1)}% of patients from the {available_index} with recorded neg. verbal response which data is handled')
 
 #Concatenation the patients' data for model training
 X_train = concatenate((X_train))
