@@ -5,6 +5,7 @@ from os import chdir
 from pandas.io.parsers import read_csv
 from scipy.interpolate import interp1d
 import random
+import pickle
 
 # Import datasets, classifiers and performance metrics
 from sklearn.metrics import ConfusionMatrixDisplay, roc_auc_score, roc_curve, accuracy_score, auc

@@ -61,6 +61,17 @@ roc_auc = dict()
 fpr, tpr, _ = roc_curve(y_test, predicted)
 roc_auc = auc(fpr, tpr)
  
+
+ # %%
+ #Saving our model
+with open("SVM_model.pickle", "wb") as file:
+    pickle.dump(SVM, file)
+
+with open("RandomForest_model.pickle", "wb") as file:
+    pickle.dump(rfc, file)
+
+print('Models Saved')
+
 # %%
 ##Comentaris
 # -1r agafar propo i remi ce, començar a agafar dades des d'on comença a infundir propo ce i si algun pacient no en té cap no agafarlo directament FET
