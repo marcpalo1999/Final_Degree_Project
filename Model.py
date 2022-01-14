@@ -17,14 +17,19 @@ from sklearn.ensemble import RandomForestClassifier
 rfc = RandomForestClassifier(n_estimators=10, random_state=42)
 rfc.fit(X_train, y_train)
 
+#Predictions
+predicted_SVM = SVM.predict(X_test)
+y_pred_proba_SVM =SVM.predict_proba(X_test)[:,-1]
+predicted_rfc = rfc.predict(X_test)
+y_pred_proba_rfc =rfc.predict_proba(X_test)[:,-1]
 
-predicted = SVM.predict(X_test)
-y_pred_proba =SVM.predict_proba(X_test)[:,-1]
-false_positive_rate, true_positive_rate, thresholds = roc_curve(y_test, y_pred_proba)
-roc_curve_plot = metrics.plot_roc_curve(SVM, X_test, y_test) 
+#------- MODEL PERFORMANCE-------
+
+# Roc and Auc
+false_positive_rate, true_positive_rate, thresholds = roc_curve(y_test, y_pred_proba_SVM)
+roc_curve_plot = metrics.plot_roc_curve(SVM, X_test, y_test, alpha = 0.8)
 ax = plt.gca()
 rfc_disp = metrics.plot_roc_curve(rfc, X_test, y_test, ax=ax, alpha=0.8)
-roc_curve_plot.plot(ax=ax, alpha=0.8)
 plt.title('ROC curve')
 plt.ylabel('True positive rate')
 plt.xlabel('False positive rate (positive label: 1)')
@@ -33,34 +38,42 @@ plt.xlabel('False positive rate (positive label: 1)')
 plt.savefig('ROC curve')
 plt.show()
 
-#Veiem que se li dona bé distingir 
-print('a')
+
+# Ploting metrics extracted from Confusion matrix and CM itserlffor SVM
 print(
     f"Classification report for classifier {SVM}:\n"
-    f"{metrics.classification_report(y_test, predicted)}\n"
+    f"{metrics.classification_report(y_test, predicted_SVM)}\n"
 )
 
-###############################################################################
-# We can also plot a :ref:`confusion matrix <confusion_matrix>` of the
 # true digit values and the predicted digit values.
+disp = ConfusionMatrixDisplay.from_predictions(y_test, predicted_SVM)
+disp.figure_.suptitle("Confusion Matrix for SVM")
+print(f"Confusion matrix for SVM:\n{disp.confusion_matrix}")
 
-disp = ConfusionMatrixDisplay.from_predictions(y_test, predicted)
-disp.figure_.suptitle("Confusion Matrix")
-print(f"Confusion matrix:\n{disp.confusion_matrix}")
-
-plt.savefig('ConfusionMatrix')
+plt.savefig('ConfusionMatrix for SVM')
 plt.show()
 
 
+# Ploting metrics extracted from Confusion matrix and CM itserlffor rfc
+print(
+    f"Classification report for classifier {rfc}:\n"
+    f"{metrics.classification_report(y_test, predicted_rfc)}\n"
+)
 
-#%%
-# Compute ROC curve and ROC area for each class
-fpr = dict()
-tpr = dict()
-roc_auc = dict()
-fpr, tpr, _ = roc_curve(y_test, predicted)
-roc_auc = auc(fpr, tpr)
- 
+# true digit values and the predicted digit values.
+disp = ConfusionMatrixDisplay.from_predictions(y_test, predicted_rfc)
+disp.figure_.suptitle("Confusion Matrix for rfc")
+print(f"Confusion matrix for rfc:\n{disp.confusion_matrix}")
+
+plt.savefig('ConfusionMatrix for rfc')
+plt.show()
+
+
+ # %%
+ #---------Feature importance--------
+feature_names = ['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE']
+importances = rfc.feature_importances_
+plt.pie(importances, labels = feature_names)
 
  # %%
  #Saving our model
