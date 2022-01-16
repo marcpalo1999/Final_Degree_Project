@@ -1,5 +1,4 @@
-#necessary imports
-#exec(open("scripto.py").read())
+#Importing libraries
 from libraries import *
 
 
@@ -13,6 +12,7 @@ y_test = pd.read_csv('/Users/marcpalomercadenas/Desktop/TFG/TFG/TrainTestMatrice
 SVM = svm.SVC(gamma='scale', probability= True) #, probability = True
 SVM.fit(X_train, y_train)
 
+# Create 2nd classifier: a Random forest classifier
 from sklearn.ensemble import RandomForestClassifier
 rfc = RandomForestClassifier(n_estimators=10, random_state=42)
 rfc.fit(X_train, y_train)
