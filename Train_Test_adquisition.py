@@ -29,16 +29,19 @@ def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
     a = 0
     b = 0
 
-    patient_dataframe.reset_index(drop=True)
+    
     #We search for "verb'" inside the event feature
     try:
         idx = list(patient_dataframe['EVENT']).index(word1)
+    
     except ValueError:
         a = 1
 
     #We search for "verbal" inside the event feature
     try :
         idx = list(patient_dataframe['EVENT']).index(word2)
+        
+
     except ValueError:
         b = 1
     
@@ -46,13 +49,17 @@ def finder(patient_dataframe, word1, word2):#, propo = True, remif = True):
     #If neither of the options has been useful to detecting the verbal response the error increases
     if a*b == 1:
         idx = []
+        LoC_time = 0
+    else:
+        LoC_time = patient_dataframe['TIME'].loc[idx]
 
-    return idx
+
+    return [idx, LoC_time]
 
 # entering the df of a patient and moment o fverbal response (idx) and the desired features it returns the patient df  cassted to 120s and interposalted and the resulting output (LoC  = 0 or 1)
-def data_preprocessing(patient_dataframe,idx,selected_features):
+def data_preprocessing(patient_dataframe,idx,LoC_t,selected_features):
     #Busquem el index del primer valor de propo i si no hi és descartem el pacient
-    patient_dataframe.reset_index(drop = True)
+    
     fvi = patient_dataframe['PROPO_CE'].first_valid_index()
     
     #Interpolation of variables
@@ -63,29 +70,36 @@ def data_preprocessing(patient_dataframe,idx,selected_features):
         #Aqui està agafpd.ant el index de 60 abans del verbal
         
         a = patient_dataframe.loc[fvi:(2*idx-fvi),:]
-        a.reset_index(drop=True)
-
+        
+        
         #Interpolem Nans
-        a.interpolate(method='linear', limit_direction='forward', axis=0)
+        a.interpolate(method='linear', limit_direction='forward', axis=0, inplace = True)
 
         #LoC binarisation (creatinc a vector of 0 until negative verbal response, and the other are 1)
         #Generatinc LoC feature from 'Event' extraction
-        a['LoC'] = 0
-        a.loc[idx:,'LoC'] = 1
+        index_LoC = list(a['TIME']).index(LoC_t)
+        a.reset_index(drop = True, inplace = True)
         
+        LoC_index = list(a['TIME']).index(LoC_t)
+        a['LoC']=0
+        a.loc[LoC_index:,'LoC']=1
+
         #CUIDADO QUE AQUI ESTEM PERDENT INFO, EN CONCRET TOT ELS QUE FAN PROPO I NO REMI
-        a = a.loc[:,['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE', 'LoC']]
+        a = a.loc[:,['ECG_HR', 'NIBP_MEAN','PROPO_CE', 'REMI_CE', 'LoC', 'TIME']]
         a.loc[:,'REMI_CE'] = a.loc[:,'REMI_CE'].fillna(0)
         a = a.dropna()
+        a.reset_index(drop = True, inplace = True)
         LoC = a['LoC']
+        Time = a['TIME']
         a = a.loc[:,selected_features]
     else: 
         a = pd.DataFrame(columns= selected_features)
         LoC = pd.DataFrame()
+        Time = pd.DataFrame()
     
     
 
-    return [a, LoC]
+    return [a, LoC, Time]
 
 #Variable initialization
 general_dataframe = pd.DataFrame()
@@ -111,14 +125,14 @@ for patient_ID, event_state in zip(source['ID'],source['EVENTS']):
         archive = pd.read_csv(patient_ID+'.csv')
 
         #Finder returns the index of the verbal response
-        index = finder(patient_dataframe = archive, word1 = "verb'", word2 ="verbal")
+        index, LoC_t = finder(patient_dataframe = archive, word1 = "verb'", word2 ="verbal")
 
         #If there is index of verbal response, there is verbal response
         if index != []:
             available_index = available_index+1
             
             #We cut the patients' dataframe info  +/- 2 minutes from the lose of verbal response
-            frame, LoC = data_preprocessing(archive,index,selected_features)
+            frame, LoC, Time = data_preprocessing(archive,index,LoC_t,selected_features)
             
 
             #We append the 240 seconds patients' dataframes for later concatenation and visualization
